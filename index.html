@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FUJI STUDIO — Showreel</title>
+
+<!--
+==================================================================
+  วิธีแก้ไขเว็บนี้  (อ่านตรงนี้ก่อนเลยครับ)
+==================================================================
+
+  เว็บนี้เลียนแบบสไตล์ fielddaysound.tv :
+  - รายชื่องานตัวใหญ่ๆ บนพื้นดำ
+  - เอาเมาส์ไปวางบนชื่อ -> วิดีโอเด้งขึ้นมาเล่นตามเมาส์
+  - บนมือถือ: แตะที่ชื่อเพื่อเล่นวิดีโอ
+
+  -------------------------------------------------
+  [1] จะเปลี่ยน "ชื่องาน" -> ไปแก้ที่ <li> ในส่วน <ul class="reel"> ด้านล่าง
+  -------------------------------------------------
+  [2] จะใส่ "วิดีโอ" -> แก้ค่าใน data-video="..." ของแต่ละ <li>
+      - สร้างโฟลเดอร์ชื่อ  videos/  ไว้ข้างๆ ไฟล์ index.html นี้
+      - เอาไฟล์ .mp4 ไปวางในนั้น แล้วใส่ชื่อให้ตรง เช่น  videos/fuji-can30.mp4
+      - ถ้ายังไม่ใส่วิดีโอ มันจะโชว์เป็นแผ่นไล่สีพร้อมชื่องานแทน (ไม่พัง)
+  -------------------------------------------------
+  [3] จะเพิ่ม/ลบงาน -> ก๊อป <li> ทั้งบรรทัดมาเพิ่ม หรือลบออกได้เลย
+  -------------------------------------------------
+  [4] จะเปลี่ยนสี/ฟอนต์ -> แก้ในส่วน :root { ... } ของ <style>
+  -------------------------------------------------
+  [5] เอาขึ้นเว็บ (Netlify) -> ลากทั้งโฟลเดอร์ (index.html + โฟลเดอร์ videos)
+      ไปวางในหน้า netlify drop  เท่านั้นเอง
+==================================================================
+-->
+
+<!-- ฟอนต์: Anton = ชื่องานตัวใหญ่ / Syne = หัวแบรนด์อาร์ตๆ / JetBrains Mono = ตัวเล็กแนวเทคนิค -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  /* ===== [4] สี / ค่าหลัก แก้ตรงนี้ ===== */
+  :root{
+    --bg:        #0b0b0c;   /* สีพื้นหลัง */
+    --ink:       #f2f0e9;   /* สีตัวอักษร */
+    --dim:       #6c6c6e;   /* สีตัวอักษรจางๆ */
+    --accent:    #d8ff3e;   /* สีไฮไลต์ (เขียวมะนาว) */
+    --line:      rgba(242,240,233,.14);
+    --reel-size: clamp(2.6rem, 11vw, 9rem); /* ขนาดชื่องาน */
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html,body{ height:100%; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'JetBrains Mono', monospace;
+    overflow-x:hidden;
+    cursor:none;                 /* ซ่อนเมาส์จริง เพราะเราทำเมาส์เองด้านล่าง */
+  }
+  @media (hover:none){ body{ cursor:auto; } }  /* มือถือใช้เมาส์ปกติ */
+
+  a{ color:inherit; text-decoration:none; }
+
+  /* ---- เม็ดเกรน (grain) บางๆ ให้ดูมีเท็กซ์เจอร์ ---- */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:9999; pointer-events:none;
+    opacity:.05; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ===================== LOADER (ตัวนับ 0->100) ===================== */
+  .loader{
+    position:fixed; inset:0; z-index:1000; background:var(--bg);
+    display:flex; align-items:flex-end; justify-content:flex-end;
+    padding:6vw; transition:opacity .6s ease, visibility .6s;
+  }
+  .loader.done{ opacity:0; visibility:hidden; }
+  .loader .count{ font-family:'Anton'; font-size:clamp(4rem,16vw,14rem); line-height:.8; }
+  .loader .count::after{ content:"%"; font-size:.4em; color:var(--accent); margin-left:.1em; }
+
+  /* ===================== HEADER ===================== */
+  header{
+    position:fixed; top:0; left:0; width:100%; z-index:100;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:1.5rem 6vw; mix-blend-mode:difference;
+  }
+  /* หัวแบรนด์ LAUM VENDING แบบอาร์ตๆ */
+  .logo{
+    font-family:'Syne', sans-serif;
+    font-weight:800;
+    font-size:1.5rem;
+    letter-spacing:.02em;
+    line-height:1;
+    display:inline-flex;
+    gap:.4em;
+    align-items:baseline;
+  }
+  .logo .a{
+    /* คำแรก = ไล่สีจางๆ */
+    background:linear-gradient(180deg, var(--ink), var(--dim));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .logo .b{
+    /* คำที่สอง = ตัวโปร่ง ขอบเส้น สีไฮไลต์ ดูอาร์ต */
+    color:transparent;
+    -webkit-text-stroke:1.3px var(--accent);
+    font-style:italic;
+  }
+  nav{ display:flex; gap:1.6rem; font-size:.8rem; letter-spacing:.1em; text-transform:uppercase; }
+  nav a{ opacity:.7; transition:opacity .25s; }
+  nav a:hover{ opacity:1; }
+
+  /* ===================== MAIN / REEL LIST ===================== */
+  main{ min-height:100vh; display:flex; align-items:center; padding:8rem 6vw 4rem; }
+
+  .reel{ list-style:none; width:100%; }
+  .reel li{
+    position:relative;
+    border-top:1px solid var(--line);
+    display:flex; align-items:center; gap:1.5rem;
+    padding:.35em 0;
+    cursor:none;
+  }
+  .reel li:last-child{ border-bottom:1px solid var(--line); }
+  @media (hover:none){ .reel li{ cursor:pointer; } }
+
+  .reel .idx{ font-size:.8rem; color:var(--dim); width:2.5rem; flex:none; }
+
+  .reel .name{
+    font-family:'Anton';
+    font-size:var(--reel-size);
+    line-height:.95;
+    letter-spacing:.01em;
+    color:var(--ink);
+    transition:transform .4s cubic-bezier(.2,.8,.2,1), color .3s, opacity .3s;
+    transform-origin:left center;
+    will-change:transform;
+  }
+  /* พอ hover อันนึง อันอื่นจะจางลง ตัวที่โดนจะขยับ+เปลี่ยนสี */
+  .reel:hover .name{ opacity:.35; }
+  .reel li:hover .name{ opacity:1; color:var(--accent); transform:translateX(2.5vw); }
+
+  .reel .tag{ margin-left:auto; font-size:.8rem; color:var(--dim); letter-spacing:.08em; }
+
+  /* ===================== PREVIEW (วิดีโอลอยตามเมาส์) ===================== */
+  .preview{
+    position:fixed; top:0; left:0; z-index:50;
+    width:24vw; max-width:420px; aspect-ratio:16/10;
+    border-radius:8px; overflow:hidden;
+    pointer-events:none;
+    transform:translate(-50%,-50%) scale(.6);
+    opacity:0; transition:opacity .35s ease, transform .45s cubic-bezier(.2,.8,.2,1);
+    box-shadow:0 30px 80px rgba(0,0,0,.6);
+  }
+  .preview.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .preview video{ width:100%; height:100%; object-fit:cover; display:block; }
+  /* แผ่นสำรอง ถ้ายังไม่ใส่วิดีโอ จะโชว์อันนี้แทน */
+  .preview .fallback{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'Anton'; font-size:1.6rem; text-align:center; color:#0b0b0c; padding:1rem;
+    background:linear-gradient(135deg,var(--accent),#5ad1ff);
+  }
+
+  /* ===================== CUSTOM CURSOR (เมาส์ที่เราทำเอง) ===================== */
+  .cursor{
+    position:fixed; top:0; left:0; z-index:200; pointer-events:none;
+    width:14px; height:14px; border-radius:50%; background:var(--accent);
+    transform:translate(-50%,-50%);
+    transition:width .3s, height .3s, background .3s;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.6rem; color:#0b0b0c; letter-spacing:.1em; font-weight:500;
+    mix-blend-mode:difference;
+  }
+  .cursor.big{ width:84px; height:84px; background:var(--accent); }
+  .cursor .label{ opacity:0; transition:opacity .2s; }
+  .cursor.big .label{ opacity:1; }
+  @media (hover:none){ .cursor{ display:none; } }
+
+  /* ===================== HINT มุมจอ ===================== */
+  .hint{
+    position:fixed; bottom:6vw; left:6vw; z-index:60;
+    font-size:.75rem; letter-spacing:.25em; text-transform:uppercase; color:var(--dim);
+  }
+  .hint b{ color:var(--accent); font-weight:500; }
+</style>
+</head>
+<body>
+
+  <!-- ตัวนับตอนโหลด -->
+  <div class="loader"><div class="count" id="count">0</div></div>
+
+  <!-- หัวเว็บ : แก้ชื่อสตูดิโอ / เมนู ได้ตรงนี้ -->
+  <header>
+    <div class="logo"><span class="a">LAUM</span><span class="b">VENDING</span></div>
+    <nav>
+      <a href="#">Work</a>
+      <a href="#">About</a>
+      <a href="#">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============================================================
+         [1][2][3]  รายชื่องาน — แก้/เพิ่ม/ลบ ตรงนี้
+         - ชื่องาน = ข้อความใน <span class="name">
+         - วิดีโอ  = data-video="videos/ชื่อไฟล์.mp4"
+         ============================================================ -->
+    <ul class="reel" id="reel">
+
+      <li data-video="videos/fuji-can30.mp4">
+        <span class="idx">01</span>
+        <span class="name">FUJI CAN30</span>
+        <span class="tag">โปรเจกต์</span>
+      </li>
+
+      <li data-video="videos/fuji-can36.mp4">
+        <span class="idx">02</span>
+        <span class="name">FUJI CAN36</span>
+        <span class="tag">โปรเจกต์</span>
+      </li>
+
+      <li data-video="videos/funi-small.mp4">
+        <span class="idx">03</span>
+        <span class="name">FUNI SMALL</span>
+        <span class="tag">โปรเจกต์</span>
+      </li>
+
+      <li data-video="videos/fuji-small-plaus.mp4">
+        <span class="idx">04</span>
+        <span class="name">FUJI SMALL PLAUS</span>
+        <span class="tag">โปรเจกต์</span>
+      </li>
+
+    </ul>
+  </main>
+
+  <!-- กล่องวิดีโอที่ลอยตามเมาส์ -->
+  <div class="preview" id="preview">
+    <div class="fallback" id="fallback">PREVIEW</div>
+    <video id="pvVideo" muted loop playsinline preload="metadata"></video>
+  </div>
+
+  <!-- เมาส์ที่เราทำเอง -->
+  <div class="cursor" id="cursor"><span class="label">VIEW</span></div>
+
+  <!-- ข้อความมุมจอ -->
+  <div class="hint">เลื่อนเมาส์ไปบนชื่อ <b>/ HOVER TO PLAY</b></div>
+
+<script>
+/* =========================================================
+   สคริปต์ทั้งหมด — ปกติไม่ต้องแก้ก็ได้
+   ========================================================= */
+
+/* ---------- 1) LOADER ตัวนับ 0 -> 100 ---------- */
+(function(){
+  const el = document.getElementById('count');
+  const loader = document.querySelector('.loader');
+  let n = 0;
+  const t = setInterval(()=>{
+    n += Math.floor(Math.random()*8)+3;
+    if(n >= 100){ n = 100; clearInterval(t); setTimeout(()=>loader.classList.add('done'), 350); }
+    el.textContent = n;
+  }, 80);
+})();
+
+/* ---------- 2) CUSTOM CURSOR ---------- */
+const cursor = document.getElementById('cursor');
+let mx = innerWidth/2, my = innerHeight/2, cx = mx, cy = my;
+addEventListener('mousemove', e=>{ mx = e.clientX; my = e.clientY; });
+(function loop(){
+  cx += (mx-cx)*0.2; cy += (my-cy)*0.2;          // หน่วงให้ลื่น
+  cursor.style.transform = `translate(${cx}px, ${cy}px) translate(-50%,-50%)`;
+  requestAnimationFrame(loop);
+})();
+
+/* ---------- 3) PREVIEW วิดีโอตามเมาส์ ---------- */
+const preview  = document.getElementById('preview');
+const video    = document.getElementById('pvVideo');
+const fallback = document.getElementById('fallback');
+const items    = document.querySelectorAll('#reel li');
+
+let px = mx, py = my;
+(function pvLoop(){
+  px += (mx-px)*0.12; py += (my-py)*0.12;         // วิดีโอตามช้ากว่าเมาส์นิดนึง = ดูลื่น
+  preview.style.left = px + 'px';
+  preview.style.top  = py + 'px';
+  requestAnimationFrame(pvLoop);
+})();
+
+function openPreview(li){
+  const src  = li.getAttribute('data-video');
+  const name = li.querySelector('.name').textContent;
+  fallback.textContent = name;            // เผื่อไม่มีไฟล์วิดีโอ ก็โชว์ชื่อ
+  video.style.opacity = 0;                // ซ่อนวิดีโอไว้ก่อน รอโหลด
+  if(src){
+    video.src = src;
+    video.play().catch(()=>{});           // บางเบราเซอร์ต้องมี catch
+  }
+  preview.classList.add('show');
+  cursor.classList.add('big');
+}
+function closePreview(){
+  preview.classList.remove('show');
+  cursor.classList.remove('big');
+  video.pause();
+}
+
+/* ถ้าโหลดวิดีโอได้ -> โชว์วิดีโอทับแผ่นสำรอง */
+video.addEventListener('loadeddata', ()=>{ video.style.opacity = 1; });
+/* ถ้าโหลดไม่ได้ (ยังไม่ใส่ไฟล์) -> ให้แผ่นสำรองโชว์แทน */
+video.addEventListener('error', ()=>{ video.style.opacity = 0; });
+
+/* ---------- เดสก์ท็อป: hover ---------- */
+items.forEach(li=>{
+  li.addEventListener('mouseenter', ()=> openPreview(li));
+  li.addEventListener('mouseleave', closePreview);
+});
+
+/* ---------- มือถือ: แตะเพื่อเล่น ---------- */
+if(matchMedia('(hover:none)').matches){
+  preview.style.cssText += 'position:fixed;left:50%;top:50%;width:80vw;max-width:none;';
+  let openLi = null;
+  items.forEach(li=>{
+    li.addEventListener('click', ()=>{
+      if(openLi === li){ closePreview(); openLi = null; }
+      else{ openPreview(li); openLi = li; }
+    });
+  });
+}
+</script>
+</body>
+</html>

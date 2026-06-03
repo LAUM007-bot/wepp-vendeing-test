@@ -294,6 +294,7 @@ function openPreview(li){
   fallback.textContent = name;            // เผื่อไม่มีไฟล์วิดีโอ ก็โชว์ชื่อ
   video.style.opacity = 0;                // ซ่อนวิดีโอไว้ก่อน รอโหลด
   if(src){
+    checkFile(src);                       // <-- ตรวจว่าเซิร์ฟเวอร์เสิร์ฟไฟล์จริงไหม (ดู Console)
     video.src = src;
     video.play().catch(()=>{});           // บางเบราเซอร์ต้องมี catch
   }
@@ -306,10 +307,33 @@ function closePreview(){
   video.pause();
 }
 
+/* ตรวจว่าเซิร์ฟเวอร์เสิร์ฟไฟล์อะไรกลับมาจริงๆ (ช่วย debug — ดูผลใน Console กด F12) */
+const _checked = new Set();
+function checkFile(src){
+  if(_checked.has(src)) return; _checked.add(src);
+  fetch(src, {method:'GET', headers:{Range:'bytes=0-1'}})
+    .then(r=>{
+      const type = r.headers.get('content-type') || '?';
+      const len  = r.headers.get('content-range') || r.headers.get('content-length') || '?';
+      const ok   = /video\//.test(type);
+      console.log('%c[CHECK] '+src+'\n  สถานะ: '+r.status+'  | ชนิดไฟล์: '+type+'  | ขนาด: '+len,
+        ok ? 'color:#7CFC00' : 'color:#ff5252;font-weight:bold');
+      if(!ok) console.warn('  ⚠ ชนิดไฟล์ไม่ใช่ video/* -> เซิร์ฟเวอร์เสิร์ฟไฟล์ผิด (มักเป็น Git LFS pointer หรือหน้า HTML)');
+    })
+    .catch(e=> console.error('[CHECK] เรียกไฟล์ไม่ได้:', e.message));
+}
+
 /* ถ้าโหลดวิดีโอได้ -> โชว์วิดีโอทับแผ่นสำรอง */
-video.addEventListener('loadeddata', ()=>{ video.style.opacity = 1; });
-/* ถ้าโหลดไม่ได้ (ยังไม่ใส่ไฟล์) -> ให้แผ่นสำรองโชว์แทน */
-video.addEventListener('error', ()=>{ video.style.opacity = 0; });
+video.addEventListener('loadeddata', ()=>{
+  video.style.opacity = 1;
+  console.log('%c[VIDEO OK] โหลดได้: ' + video.currentSrc, 'color:#7CFC00');
+});
+/* ถ้าโหลดไม่ได้ (ไฟล์หาย/พาธผิด) -> โชว์แผ่นสำรอง + บอกพาธที่หาไม่เจอใน Console */
+video.addEventListener('error', ()=>{
+  video.style.opacity = 0;
+  console.error('[VIDEO FAIL] หาไฟล์ไม่เจอ -> ' + video.src +
+    '  | เช็ก: ไฟล์อยู่ในโฟลเดอร์ videos/ จริงไหม + ชื่อไฟล์ตรงเป๊ะไหม (พิมพ์เล็ก/ใหญ่สำคัญ)');
+});
 
 /* ---------- เดสก์ท็อป: hover ---------- */
 items.forEach(li=>{
